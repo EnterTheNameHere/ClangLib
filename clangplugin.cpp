@@ -169,7 +169,7 @@ void ClangPlugin::OnAttach()
     m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangPlugin>(this, &ClangPlugin::OnEditorHook));
 }
 
-void ClangPlugin::OnRelease(bool appShutDown)
+void ClangPlugin::OnRelease(cb_unused bool appShutDown)
 {
     EditorHooks::UnregisterHook(m_EditorHookId);
     Disconnect(idGotoDeclaration);
@@ -363,7 +363,7 @@ wxString ClangPlugin::GetDocumentation(const CCToken& token)
     return wxEmptyString;
 }
 
-std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, int style, cbEditor* ed, int& argsPos)
+std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, cb_unused int style, cbEditor* ed, int& argsPos)
 {
     std::vector<CCCallTip> tips;
     if (ed != m_pLastEditor)
@@ -451,7 +451,7 @@ std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, int style,
     return tips;
 }
 
-std::vector<ClangPlugin::CCToken> ClangPlugin::GetTokenAt(int pos, cbEditor* ed, bool& allowCallTip)
+std::vector<ClangPlugin::CCToken> ClangPlugin::GetTokenAt(int pos, cbEditor* ed, cb_unused bool& allowCallTip)
 {
     std::vector<CCToken> tokens;
     if (ed != m_pLastEditor)
@@ -474,7 +474,7 @@ std::vector<ClangPlugin::CCToken> ClangPlugin::GetTokenAt(int pos, cbEditor* ed,
     return tokens;
 }
 
-wxString ClangPlugin::OnDocumentationLink(wxHtmlLinkEvent& event, bool& dismissPopup)
+wxString ClangPlugin::OnDocumentationLink(cb_unused wxHtmlLinkEvent& event, cb_unused bool& dismissPopup)
 {
     return wxEmptyString;
 }
@@ -497,10 +497,13 @@ void ClangPlugin::DoAutocomplete(const CCToken& token, cbEditor* ed)
     {
         if (!suffix.IsEmpty())
         {
-            if (stc->GetCharAt(endPos) == suffix[0])
+            if ( static_cast<unsigned int>( stc->GetCharAt(endPos) ) == suffix[0].GetValue() )
             {
-                if (suffix.Length() != 2 || stc->GetCharAt(endPos + 1) != suffix[1])
+                if ( suffix.Length() != 2
+                     || static_cast<unsigned int>( stc->GetCharAt(endPos + 1) ) != suffix[1].GetValue() )
+                {
                     offsets = std::make_pair(1, 1);
+                }
             }
             else
                 tknText += suffix;
@@ -535,7 +538,7 @@ void ClangPlugin::BuildMenu(wxMenuBar* menuBar)
     }
 }
 
-void ClangPlugin::BuildModuleMenu(const ModuleType type, wxMenu* menu, const FileTreeData* data)
+void ClangPlugin::BuildModuleMenu(const ModuleType type, wxMenu* menu, cb_unused const FileTreeData* data)
 {
     if (type != mtEditorManager)
         return;

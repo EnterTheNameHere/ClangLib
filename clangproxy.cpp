@@ -131,7 +131,8 @@ class TranslationUnit
     private:
 #if __cplusplus >= 201103L
         // copying not allowed (we can move)
-        TranslationUnit(const TranslationUnit& /*other*/) { cbThrow(wxT("Illegal copy attempted of TranslationUnit object.")); }
+        TranslationUnit( const TranslationUnit& ) = delete;
+        TranslationUnit& operator = ( const TranslationUnit& ) = delete;
 #endif
 
         void ExpandDiagnosticSet(CXDiagnosticSet diagSet, std::vector<ClDiagnostic>& diagnostics)
@@ -314,7 +315,7 @@ namespace HTML_Writer
         for (wxString::const_iterator itr = text.begin();
              itr != text.end(); ++itr)
         {
-            switch (*itr)
+            switch ( static_cast<wxString::char_type::value_type> ( *itr ) )
             {
                 case wxT('&'):  html += wxT("&amp;");  break;
                 case wxT('\"'): html += wxT("&quot;"); break;
@@ -342,8 +343,8 @@ namespace HTML_Writer
         const int codeLen = code.Length();
         for (int enRg = 0; enRg <= codeLen; ++enRg)
         {
-            wxChar ch = (enRg < codeLen ? code[enRg] : wxT('\0'));
-            wxChar nextCh = (enRg < codeLen - 1 ? code[enRg + 1] : wxT('\0'));
+            wxChar ch = (enRg < codeLen ? code[enRg].GetValue() : wxT('\0'));
+            wxChar nextCh = (enRg < codeLen - 1 ? code[enRg + 1].GetValue() : wxT('\0'));
             switch (style)
             {
                 default:
