@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="ClangLib wx3.0.x" />
+		<Option pch_mode="2" />
+		<Option default_target="ClangLib" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="ClangLib">
+				<Option output="../../devel30/share/codeblocks/plugins/clanglib" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="../../devel30" />
+				<Option object_output="../../.objs30/plugins/clanglib" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option parameters="--debug-log --multiple-instance --no-check-associations -ns -nd -v -p debug" />
+				<Option host_application="./codeblocks" />
+				<Option run_host_application_in_terminal="0" />
+				<Compiler>
+					<Add option="-DBUILDING_PLUGIN" />
+				</Compiler>
+				<ExtraCommands>
+					<Add after="zip -j9 ../../devel30/share/codeblocks/clanglib.zip resources/manifest.xml" />
+				</ExtraCommands>
+			</Target>
+			<Environment>
+				<Variable name="WX_CFG" value="" />
+				<Variable name="WX_SUFFIX" value="u" />
+				<Variable name="WX_VERSION" value="30" />
+			</Environment>
+		</Build>
+		<VirtualTargets>
+			<Add alias="All" targets="ClangLib;" />
+		</VirtualTargets>
+		<Compiler>
+			<Add option="-Wextra" />
+			<Add option="-Wall" />
+			<Add option="$(#CB_RELEASE_TYPE)" />
+			<Add option="-pipe" />
+			<Add option="-mthreads" />
+			<Add option="-fmessage-length=0" />
+			<Add option="-fexceptions" />
+			<Add option="-Winvalid-pch" />
+			<Add option="-DHAVE_W32API_H" />
+			<Add option="-D__WXMSW__" />
+			<Add option="-DWXUSINGDLL" />
+			<Add option="-DcbDEBUG" />
+			<Add option="-DCB_PRECOMP" />
+			<Add option="-DWX_PRECOMP" />
+			<Add option="-DwxUSE_UNICODE" />
+			<Add directory="../../include" />
+			<Add directory="../../sdk/wxscintilla/include" />
+			<Add directory="$(#WX30.include)" />
+			<Add directory="$(#WX30.lib)/gcc_dll$(WX_CFG)/msw$(WX_SUFFIX)" />
+			<Add directory="$(#clang.include)" />
+		</Compiler>
+		<Linker>
+			<Add option="-Wl,--enable-auto-image-base" />
+			<Add option="-Wl,--add-stdcall-alias" />
+			<Add option="-Wl,--enable-auto-import" />
+			<Add option="-Wl,--no-undefined" />
+			<Add option="-mthreads" />
+			<Add library="clang" />
+			<Add library="wxmsw$(WX_VERSION)$(WX_SUFFIX)" />
+			<Add library="codeblocks" />
+			<Add directory="$(#clang)/bin" />
+			<Add directory="../../devel30" />
+			<Add directory="$(#clang.lib)" />
+			<Add directory="$(#WX30.lib)/gcc_dll$(WX_CFG)" />
+		</Linker>
+		<Unit filename="clangplugin.cpp" />
+		<Unit filename="clangplugin.h" />
+		<Unit filename="clangproxy.cpp" />
+		<Unit filename="clangproxy.h" />
+		<Unit filename="resources/manifest.xml" />
+		<Unit filename="tokendatabase.cpp" />
+		<Unit filename="tokendatabase.h" />
+		<Unit filename="treemap.cpp" />
+		<Unit filename="treemap.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
