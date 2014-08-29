@@ -68,6 +68,10 @@
 			<Add directory="$(#clang.lib)" />
 			<Add directory="$(#WX30.lib)/gcc_dll$(WX_CFG)" />
 		</Linker>
+		<ExtraCommands>
+			<Add after='xcopy &quot;$(#clang.bin)\libclang.dll&quot; &quot;..\..\devel30&quot; /q /d' />
+			<Mode after="always" />
+		</ExtraCommands>
 		<Unit filename="clangplugin.cpp" />
 		<Unit filename="clangplugin.h" />
 		<Unit filename="clangproxy.cpp" />
