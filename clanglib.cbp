@@ -68,6 +68,7 @@
 			<Add directory="$(#clang.lib)" />
 			<Add directory="$(#WX.lib)/gcc_dll$(WX_CFG)" />
 		</Linker>
+		<Unit filename="README.md" />
 		<Unit filename="clangplugin.cpp" />
 		<Unit filename="clangplugin.h" />
 		<Unit filename="clangproxy.cpp" />
@@ -75,6 +76,8 @@
 		<Unit filename="resources/manifest.xml" />
 		<Unit filename="tokendatabase.cpp" />
 		<Unit filename="tokendatabase.h" />
+		<Unit filename="translationunit.cpp" />
+		<Unit filename="translationunit.h" />
 		<Unit filename="treemap.cpp" />
 		<Unit filename="treemap.h" />
 		<Extensions>

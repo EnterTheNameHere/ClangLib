@@ -6,8 +6,9 @@
 
 #include "clangplugin.h"
 
-#include <compilercommandgenerator.h>
+#include <cbcolourmanager.h>
 #include <cbstyledtextctrl.h>
+#include <compilercommandgenerator.h>
 #include <editor_hooks.h>
 
 #include <wx/tokenzr.h>
@@ -38,6 +39,7 @@ static const wxString g_InvalidStr(wxT("invalid"));
 const int idEdOpenTimer     = wxNewId();
 const int idReparseTimer    = wxNewId();
 const int idDiagnosticTimer = wxNewId();
+const int idHightlightTimer = wxNewId();
 
 const int idGotoDeclaration = wxNewId();
 
@@ -46,6 +48,7 @@ const int idGotoDeclaration = wxNewId();
 #define ED_ACTIVATE_DELAY 150
 #define REPARSE_DELAY 900
 #define DIAGNOSTIC_DELAY 3000
+#define HIGHTLIGHT_DELAY 1700
 
 ClangPlugin::ClangPlugin() :
     m_Proxy(m_Database, m_CppKeywords),
@@ -53,6 +56,7 @@ ClangPlugin::ClangPlugin() :
     m_EdOpenTimer(this, idEdOpenTimer),
     m_ReparseTimer(this, idReparseTimer),
     m_DiagnosticTimer(this, idDiagnosticTimer),
+    m_HightlightTimer(this, idHightlightTimer),
     m_pLastEditor(nullptr),
     m_TranslUnitId(wxNOT_FOUND)
 {
@@ -69,88 +73,52 @@ void ClangPlugin::OnAttach()
     wxBitmap bmp;
     wxString prefix = ConfigManager::GetDataFolder() + wxT("/images/codecompletion/");
     // bitmaps must be added by order of PARSER_IMG_* consts (which are also TokenCategory enums)
-    bmp = cbLoadBitmap(prefix + wxT("class_folder.png"),        wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_CLASS_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("class.png"),               wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_CLASS
-    bmp = cbLoadBitmap(prefix + wxT("class_private.png"),       wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_CLASS_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("class_protected.png"),     wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_CLASS_PROTECTED
-    bmp = cbLoadBitmap(prefix + wxT("class_public.png"),        wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_CLASS_PUBLIC
-    bmp = cbLoadBitmap(prefix + wxT("ctor_private.png"),        wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_CTOR_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("ctor_protected.png"),      wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_CTOR_PROTECTED
-    bmp = cbLoadBitmap(prefix + wxT("ctor_public.png"),         wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_CTOR_PUBLIC
-    bmp = cbLoadBitmap(prefix + wxT("dtor_private.png"),        wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_DTOR_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("dtor_protected.png"),      wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_DTOR_PROTECTED
-    bmp = cbLoadBitmap(prefix + wxT("dtor_public.png"),         wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_DTOR_PUBLIC
-    bmp = cbLoadBitmap(prefix + wxT("method_private.png"),      wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_FUNC_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("method_protected.png"),    wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_FUNC_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("method_public.png"),       wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_FUNC_PUBLIC
-    bmp = cbLoadBitmap(prefix + wxT("var_private.png"),         wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_VAR_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("var_protected.png"),       wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_VAR_PROTECTED
-    bmp = cbLoadBitmap(prefix + wxT("var_public.png"),          wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_VAR_PUBLIC
-    bmp = cbLoadBitmap(prefix + wxT("macro_def.png"),           wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_MACRO_DEF
-    bmp = cbLoadBitmap(prefix + wxT("enum.png"),                wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_ENUM
-    bmp = cbLoadBitmap(prefix + wxT("enum_private.png"),        wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_ENUM_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("enum_protected.png"),      wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_ENUM_PROTECTED
-    bmp = cbLoadBitmap(prefix + wxT("enum_public.png"),         wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_ENUM_PUBLIC
-    bmp = cbLoadBitmap(prefix + wxT("enumerator.png"),          wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_ENUMERATOR
-    bmp = cbLoadBitmap(prefix + wxT("namespace.png"),           wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_NAMESPACE
-    bmp = cbLoadBitmap(prefix + wxT("typedef.png"),             wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_TYPEDEF
-    bmp = cbLoadBitmap(prefix + wxT("typedef_private.png"),     wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_TYPEDEF_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("typedef_protected.png"),   wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_TYPEDEF_PROTECTED
-    bmp = cbLoadBitmap(prefix + wxT("typedef_public.png"),      wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_TYPEDEF_PUBLIC
-    bmp = cbLoadBitmap(prefix + wxT("symbols_folder.png"),      wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_SYMBOLS_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("vars_folder.png"),         wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_VARS_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("funcs_folder.png"),        wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_FUNCS_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("enums_folder.png"),        wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_ENUMS_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("macro_def_folder.png"),    wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_MACRO_DEF_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("others_folder.png"),       wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_OTHERS_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("typedefs_folder.png"),     wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_TYPEDEF_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("macro_use.png"),           wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_MACRO_USE
-    bmp = cbLoadBitmap(prefix + wxT("macro_use_private.png"),   wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_MACRO_USE_PRIVATE
-    bmp = cbLoadBitmap(prefix + wxT("macro_use_protected.png"), wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_MACRO_USE_PROTECTED
-    bmp = cbLoadBitmap(prefix + wxT("macro_use_public.png"),    wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_MACRO_USE_PUBLIC
-    bmp = cbLoadBitmap(prefix + wxT("macro_use_folder.png"),    wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // PARSER_IMG_MACRO_USE_FOLDER
-    bmp = cbLoadBitmap(prefix + wxT("cpp_lang.png"),            wxBITMAP_TYPE_PNG);
-    m_ImageList.Add(bmp); // tcLangKeyword
+    const char* imgs[] = {
+        "class_folder.png",        // PARSER_IMG_CLASS_FOLDER
+        "class.png",               // PARSER_IMG_CLASS
+        "class_private.png",       // PARSER_IMG_CLASS_PRIVATE
+        "class_protected.png",     // PARSER_IMG_CLASS_PROTECTED
+        "class_public.png",        // PARSER_IMG_CLASS_PUBLIC
+        "ctor_private.png",        // PARSER_IMG_CTOR_PRIVATE
+        "ctor_protected.png",      // PARSER_IMG_CTOR_PROTECTED
+        "ctor_public.png",         // PARSER_IMG_CTOR_PUBLIC
+        "dtor_private.png",        // PARSER_IMG_DTOR_PRIVATE
+        "dtor_protected.png",      // PARSER_IMG_DTOR_PROTECTED
+        "dtor_public.png",         // PARSER_IMG_DTOR_PUBLIC
+        "method_private.png",      // PARSER_IMG_FUNC_PRIVATE
+        "method_protected.png",    // PARSER_IMG_FUNC_PRIVATE
+        "method_public.png",       // PARSER_IMG_FUNC_PUBLIC
+        "var_private.png",         // PARSER_IMG_VAR_PRIVATE
+        "var_protected.png",       // PARSER_IMG_VAR_PROTECTED
+        "var_public.png",          // PARSER_IMG_VAR_PUBLIC
+        "macro_def.png",           // PARSER_IMG_MACRO_DEF
+        "enum.png",                // PARSER_IMG_ENUM
+        "enum_private.png",        // PARSER_IMG_ENUM_PRIVATE
+        "enum_protected.png",      // PARSER_IMG_ENUM_PROTECTED
+        "enum_public.png",         // PARSER_IMG_ENUM_PUBLIC
+        "enumerator.png",          // PARSER_IMG_ENUMERATOR
+        "namespace.png",           // PARSER_IMG_NAMESPACE
+        "typedef.png",             // PARSER_IMG_TYPEDEF
+        "typedef_private.png",     // PARSER_IMG_TYPEDEF_PRIVATE
+        "typedef_protected.png",   // PARSER_IMG_TYPEDEF_PROTECTED
+        "typedef_public.png",      // PARSER_IMG_TYPEDEF_PUBLIC
+        "symbols_folder.png",      // PARSER_IMG_SYMBOLS_FOLDER
+        "vars_folder.png",         // PARSER_IMG_VARS_FOLDER
+        "funcs_folder.png",        // PARSER_IMG_FUNCS_FOLDER
+        "enums_folder.png",        // PARSER_IMG_ENUMS_FOLDER
+        "macro_def_folder.png",    // PARSER_IMG_MACRO_DEF_FOLDER
+        "others_folder.png",       // PARSER_IMG_OTHERS_FOLDER
+        "typedefs_folder.png",     // PARSER_IMG_TYPEDEF_FOLDER
+        "macro_use.png",           // PARSER_IMG_MACRO_USE
+        "macro_use_private.png",   // PARSER_IMG_MACRO_USE_PRIVATE
+        "macro_use_protected.png", // PARSER_IMG_MACRO_USE_PROTECTED
+        "macro_use_public.png",    // PARSER_IMG_MACRO_USE_PUBLIC
+        "macro_use_folder.png",    // PARSER_IMG_MACRO_USE_FOLDER
+        "cpp_lang.png",            // tcLangKeyword
+        nullptr
+    };
+    for (const char** itr = imgs; *itr; ++itr)
+        m_ImageList.Add(cbLoadBitmap(prefix + wxString::FromUTF8(*itr), wxBITMAP_TYPE_PNG));
 
     EditorColourSet* theme = Manager::Get()->GetEditorManager()->GetColourSet();
     wxStringTokenizer tokenizer(theme->GetKeywords(theme->GetHighlightLanguage(wxT("C/C++")), 0));
@@ -165,14 +133,16 @@ void ClangPlugin::OnAttach()
     Connect(idEdOpenTimer,     wxEVT_TIMER, wxTimerEventHandler(ClangPlugin::OnTimer));
     Connect(idReparseTimer,    wxEVT_TIMER, wxTimerEventHandler(ClangPlugin::OnTimer));
     Connect(idDiagnosticTimer, wxEVT_TIMER, wxTimerEventHandler(ClangPlugin::OnTimer));
+    Connect(idHightlightTimer, wxEVT_TIMER, wxTimerEventHandler(ClangPlugin::OnTimer));
     Connect(idGotoDeclaration, wxEVT_COMMAND_MENU_SELECTED, /*wxMenuEventHandler*/wxCommandEventHandler(ClangPlugin::OnGotoDeclaration), nullptr, this);
     m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangPlugin>(this, &ClangPlugin::OnEditorHook));
 }
 
-void ClangPlugin::OnRelease(cb_unused bool appShutDown)
+void ClangPlugin::OnRelease(bool WXUNUSED(appShutDown))
 {
     EditorHooks::UnregisterHook(m_EditorHookId);
     Disconnect(idGotoDeclaration);
+    Disconnect(idHightlightTimer);
     Disconnect(idDiagnosticTimer);
     Disconnect(idReparseTimer);
     Disconnect(idEdOpenTimer);
@@ -203,7 +173,8 @@ static wxString GetActualName(const wxString& name)
     return name.Mid(0, idx);
 }
 
-std::vector<ClangPlugin::CCToken> ClangPlugin::GetAutocompList(bool isAuto, cbEditor* ed, int& tknStart, int& tknEnd)
+std::vector<ClangPlugin::CCToken> ClangPlugin::GetAutocompList(bool isAuto, cbEditor* ed,
+                                                               int& tknStart, int& tknEnd)
 {
     std::vector<CCToken> tokens;
     if (ed != m_pLastEditor)
@@ -213,7 +184,8 @@ std::vector<ClangPlugin::CCToken> ClangPlugin::GetAutocompList(bool isAuto, cbEd
     }
     if (m_TranslUnitId == wxNOT_FOUND)
     {
-        Manager::Get()->GetLogManager()->LogWarning(wxT("ClangLib: m_TranslUnitId == wxNOT_FOUND, cannot complete in file ") + ed->GetFilename());
+        Manager::Get()->GetLogManager()->LogWarning(wxT("ClangLib: m_TranslUnitId == wxNOT_FOUND, "
+                                                        "cannot complete in file ") + ed->GetFilename());
         return tokens;
     }
 
@@ -241,7 +213,8 @@ std::vector<ClangPlugin::CCToken> ClangPlugin::GetAutocompList(bool isAuto, cbEd
     {
         cbEditor* editor = edMgr->GetBuiltinEditor(i);
         if (editor && editor->GetModified())
-            unsavedFiles.insert(std::make_pair(editor->GetFilename(), editor->GetControl()->GetText()));
+            unsavedFiles.insert(std::make_pair(editor->GetFilename(),
+                                               editor->GetControl()->GetText()));
     }
     const int lnStart = stc->PositionFromLine(line);
     int column = tknStart - lnStart;
@@ -253,7 +226,8 @@ std::vector<ClangPlugin::CCToken> ClangPlugin::GetAutocompList(bool isAuto, cbEd
             break;
         }
     }
-    m_Proxy.CodeCompleteAt(isAuto, ed->GetFilename(), line + 1, column + 1, m_TranslUnitId, unsavedFiles, tknResults);
+    m_Proxy.CodeCompleteAt(isAuto, ed->GetFilename(), line + 1, column + 1,
+                           m_TranslUnitId, unsavedFiles, tknResults);
     const wxString& prefix = stc->GetTextRange(tknStart, tknEnd).Lower();
     bool includeCtors = true; // sometimes we get a lot of these
     for (int i = tknStart - 1; i > 0; --i)
@@ -280,7 +254,8 @@ std::vector<ClangPlugin::CCToken> ClangPlugin::GetAutocompList(bool isAuto, cbEd
         for (std::vector<ClToken>::const_iterator tknIt = tknResults.begin();
              tknIt != tknResults.end(); ++tknIt)
         {
-            if (!tknIt->name.StartsWith(wxT("operator")) && (includeCtors || tknIt->category != tcCtorPublic)) // it is rather unlikely for an operator to be the desired completion
+            // it is rather unlikely for an operator to be the desired completion
+            if (!tknIt->name.StartsWith(wxT("operator")) && (includeCtors || tknIt->category != tcCtorPublic))
                 tokens.push_back(CCToken(tknIt->id, tknIt->name, tknIt->name, tknIt->weight, tknIt->category));
         }
     }
@@ -363,7 +338,7 @@ wxString ClangPlugin::GetDocumentation(const CCToken& token)
     return wxEmptyString;
 }
 
-std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, cb_unused int style, cbEditor* ed, int& argsPos)
+std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, int style, cbEditor* ed, int& argsPos)
 {
     std::vector<CCCallTip> tips;
     if (ed != m_pLastEditor)
@@ -423,10 +398,12 @@ std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, cb_unused 
         const int column = pos - stc->PositionFromLine(line);
         const wxString& tknText = stc->GetTextRange(stc->WordStartPosition(pos, true), argsPos);
         if (!tknText.IsEmpty())
-            m_Proxy.GetCallTipsAt(ed->GetFilename(), line + 1, column + 1, m_TranslUnitId, tknText, m_LastCallTips);
+            m_Proxy.GetCallTipsAt(ed->GetFilename(), line + 1, column + 1,
+                                  m_TranslUnitId, tknText, m_LastCallTips);
     }
     m_LastCallTipPos = argsPos;
-    for (std::vector<wxStringVec>::const_iterator strVecItr = m_LastCallTips.begin(); strVecItr != m_LastCallTips.end(); ++strVecItr)
+    for (std::vector<wxStringVec>::const_iterator strVecItr = m_LastCallTips.begin();
+         strVecItr != m_LastCallTips.end(); ++strVecItr)
     {
         int strVecSz = strVecItr->size();
         if (commas != 0 && strVecSz < commas + 3)
@@ -451,7 +428,7 @@ std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, cb_unused 
     return tips;
 }
 
-std::vector<ClangPlugin::CCToken> ClangPlugin::GetTokenAt(int pos, cbEditor* ed, cb_unused bool& allowCallTip)
+std::vector<ClangPlugin::CCToken> ClangPlugin::GetTokenAt(int pos, cbEditor* ed, bool& allowCallTip)
 {
     std::vector<CCToken> tokens;
     if (ed != m_pLastEditor)
@@ -474,7 +451,7 @@ std::vector<ClangPlugin::CCToken> ClangPlugin::GetTokenAt(int pos, cbEditor* ed,
     return tokens;
 }
 
-wxString ClangPlugin::OnDocumentationLink(cb_unused wxHtmlLinkEvent& event, cb_unused bool& dismissPopup)
+wxString ClangPlugin::OnDocumentationLink(wxHtmlLinkEvent& event, bool& dismissPopup)
 {
     return wxEmptyString;
 }
@@ -487,9 +464,13 @@ void ClangPlugin::DoAutocomplete(const CCToken& token, cbEditor* ed)
         tknText.Truncate(idx);
     std::pair<int, int> offsets = std::make_pair(0, 0);
     cbStyledTextCtrl* stc = ed->GetControl();
-    wxString suffix = m_Proxy.GetCCInsertSuffix(m_TranslUnitId, token.id, GetEOLStr(stc->GetEOLMode()) + ed->GetLineIndentString(stc->GetCurrentLine()), offsets);
+    wxString suffix = m_Proxy.GetCCInsertSuffix(m_TranslUnitId, token.id,
+                                                  GetEOLStr(stc->GetEOLMode())
+                                                + ed->GetLineIndentString(stc->GetCurrentLine()),
+                                                offsets);
     int pos = stc->GetCurrentPos();
-    int startPos = std::min(stc->WordStartPosition(pos, true), std::min(stc->GetSelectionStart(), stc->GetSelectionEnd()));
+    int startPos = std::min(stc->WordStartPosition(pos, true), std::min(stc->GetSelectionStart(),
+                                                                        stc->GetSelectionEnd()));
     int moveToPos = startPos + tknText.Length();
     stc->SetTargetStart(startPos);
     int endPos = stc->WordEndPosition(pos, true);
@@ -497,13 +478,10 @@ void ClangPlugin::DoAutocomplete(const CCToken& token, cbEditor* ed)
     {
         if (!suffix.IsEmpty())
         {
-            if ( static_cast<unsigned int>( stc->GetCharAt(endPos) ) == suffix[0].GetValue() )
+            if (stc->GetCharAt(endPos) == suffix[0])
             {
-                if ( suffix.Length() != 2
-                     || static_cast<unsigned int>( stc->GetCharAt(endPos + 1) ) != suffix[1].GetValue() )
-                {
+                if (suffix.Length() != 2 || stc->GetCharAt(endPos + 1) != suffix[1])
                     offsets = std::make_pair(1, 1);
-                }
             }
             else
                 tknText += suffix;
@@ -522,10 +500,15 @@ void ClangPlugin::DoAutocomplete(const CCToken& token, cbEditor* ed)
         stc->ReplaceTarget(tknText);
     stc->SetSelectionVoid(moveToPos + offsets.first, moveToPos + offsets.second);
     stc->ChooseCaretX();
-    if (token.category != tcLangKeyword && (offsets.first != offsets.second || offsets.first == 1))
+    if (   token.category != tcLangKeyword
+        && (offsets.first != offsets.second || offsets.first == 1) )
     {
-        CodeBlocksEvent evt(cbEVT_SHOW_CALL_TIP);
-        Manager::Get()->ProcessEvent(evt);
+        int tooltipMode = Manager::Get()->GetConfigManager(wxT("ccmanager"))->ReadInt(wxT("/tooltip_mode"), 1);
+        if (tooltipMode != 3) // keybound only
+        {
+            CodeBlocksEvent evt(cbEVT_SHOW_CALL_TIP);
+            Manager::Get()->ProcessEvent(evt);
+        }
     }
 }
 
@@ -538,7 +521,8 @@ void ClangPlugin::BuildMenu(wxMenuBar* menuBar)
     }
 }
 
-void ClangPlugin::BuildModuleMenu(const ModuleType type, wxMenu* menu, cb_unused const FileTreeData* data)
+void ClangPlugin::BuildModuleMenu(const ModuleType type, wxMenu* menu,
+                                  const FileTreeData* WXUNUSED(data))
 {
     if (type != mtEditorManager)
         return;
@@ -591,7 +575,8 @@ void ClangPlugin::OnGotoDeclaration(wxCommandEvent& WXUNUSED(event))
     m_Proxy.ResolveTokenAt(filename, line, column, m_TranslUnitId);
     ed = Manager::Get()->GetEditorManager()->Open(filename);
     if (ed)
-        ed->GotoTokenPosition(line - 1, stc->GetTextRange(stc->WordStartPosition(pos, true), stc->WordEndPosition(pos, true)));
+        ed->GotoTokenPosition(line - 1, stc->GetTextRange(stc->WordStartPosition(pos, true),
+                                                          stc->WordEndPosition(pos, true)));
 }
 
 wxString ClangPlugin::GetCompilerInclDirs(const wxString& compId)
@@ -647,7 +632,8 @@ wxString ClangPlugin::GetSourceOf(cbEditor* ed)
     wxFileName candidateFile;
     bool isCandidate;
     wxArrayString fileArray;
-    wxDir::GetAllFiles(theFile.GetPath(wxPATH_GET_VOLUME), &fileArray, theFile.GetName() + wxT(".*"), wxDIR_FILES | wxDIR_HIDDEN);
+    wxDir::GetAllFiles(theFile.GetPath(wxPATH_GET_VOLUME), &fileArray,
+                       theFile.GetName() + wxT(".*"), wxDIR_FILES | wxDIR_HIDDEN);
     wxFileName currentCandidateFile = FindSourceIn(fileArray, theFile, isCandidate);
     if (isCandidate)
         candidateFile = currentCandidateFile;
@@ -675,7 +661,8 @@ wxString ClangPlugin::GetSourceOf(cbEditor* ed)
     if (project)
     {
         fileArray.Clear();
-        for (FilesList::const_iterator it = project->GetFilesList().begin(); it != project->GetFilesList().end(); ++it)
+        for (FilesList::const_iterator it = project->GetFilesList().begin();
+             it != project->GetFilesList().end(); ++it)
         {
             ProjectFile* pf = *it;
             if (!pf)
@@ -724,7 +711,8 @@ wxString ClangPlugin::GetSourceOf(cbEditor* ed)
     return wxEmptyString;
 }
 
-wxFileName ClangPlugin::FindSourceIn(const wxArrayString& candidateFilesArray, const wxFileName& activeFile, bool& isCandidate)
+wxFileName ClangPlugin::FindSourceIn(const wxArrayString& candidateFilesArray,
+                                     const wxFileName& activeFile, bool& isCandidate)
 {
     bool extStartsWithCapital = wxIsupper(activeFile.GetExt()[0]);
     wxFileName candidateFile;
@@ -744,7 +732,8 @@ wxFileName ClangPlugin::FindSourceIn(const wxArrayString& candidateFilesArray, c
     return candidateFile;
 }
 
-bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile, const wxFileName& activeFile, bool& isCandidate)
+bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile,
+                             const wxFileName& activeFile, bool& isCandidate)
 {
     if (candidateFile.GetName().CmpNoCase(activeFile.GetName()) == 0)
     {
@@ -754,7 +743,8 @@ bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile, const wxFileName& 
             if (candidateFile.GetPath() != activeFile.GetPath())
             {
                 wxArrayString fileArray;
-                wxDir::GetAllFiles(candidateFile.GetPath(wxPATH_GET_VOLUME), &fileArray, candidateFile.GetName() + wxT(".*"), wxDIR_FILES | wxDIR_HIDDEN);
+                wxDir::GetAllFiles(candidateFile.GetPath(wxPATH_GET_VOLUME), &fileArray,
+                                   candidateFile.GetName() + wxT(".*"), wxDIR_FILES | wxDIR_HIDDEN);
                 for (size_t i = 0; i < fileArray.GetCount(); ++i)
                     if (wxFileName(fileArray[i]).GetFullName() == activeFile.GetFullName())
                         return false;
@@ -770,7 +760,7 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
     if (!IsAttached())
         return;
     const int evId = event.GetId();
-    if (evId == idEdOpenTimer)
+    if (evId == idEdOpenTimer) // m_EdOpenTimer
     {
         cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
         if (!ed || !IsProviderFor(ed))
@@ -784,7 +774,7 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
         ProjectFile* pf = ed->GetProjectFile();
         ProjectBuildTarget* target = nullptr;
         Compiler* comp = nullptr;
-        if (pf && pf->GetParentProject() && (pf->GetBuildTargets().Count() > 0) )
+        if (pf && pf->GetParentProject() && !pf->GetBuildTargets().IsEmpty() )
         {
             target = pf->GetParentProject()->GetBuildTarget(pf->GetBuildTargets()[0]);
             comp = CompilerFactory::GetCompiler(target->GetCompilerID());
@@ -837,7 +827,7 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
         m_Proxy.CreateTranslationUnit(ed->GetFilename(), compileCommand);
         m_DiagnosticTimer.Start(DIAGNOSTIC_DELAY, wxTIMER_ONE_SHOT);
     }
-    else if (evId == idReparseTimer)
+    else if (evId == idReparseTimer) // m_ReparseTimer
     {
         EditorManager* edMgr = Manager::Get()->GetEditorManager();
         cbEditor* ed = edMgr->GetBuiltinActiveEditor();
@@ -860,7 +850,8 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
         m_Proxy.Reparse(m_TranslUnitId, unsavedFiles);
         DiagnoseEd(m_pLastEditor, dlMinimal);
     }
-    else if (evId == idDiagnosticTimer)
+    // m_DiagnosticTimer, m_HightlightTime
+    else if (evId == idDiagnosticTimer || evId == idHightlightTimer)
     {
         cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
         if (!ed)
@@ -872,7 +863,10 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
         }
         if (m_TranslUnitId == wxNOT_FOUND)
             return;
-        DiagnoseEd(ed, dlFull);
+        if (evId == idDiagnosticTimer)
+            DiagnoseEd(ed, dlFull);
+        else
+            HighlightOccurrences(ed);
     }
     else
         event.Skip();
@@ -889,6 +883,14 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
         {
             m_ReparseTimer.Start(REPARSE_DELAY, wxTIMER_ONE_SHOT);
             m_DiagnosticTimer.Start(DIAGNOSTIC_DELAY, wxTIMER_ONE_SHOT);
+        }
+    }
+    else if (event.GetEventType() == wxEVT_SCI_UPDATEUI)
+    {
+        if (event.GetUpdated() & wxSCI_UPDATE_SELECTION)
+        {
+            m_HightlightTimer.Stop();
+            m_HightlightTimer.Start(HIGHTLIGHT_DELAY, wxTIMER_ONE_SHOT);
         }
     }
 }
@@ -936,12 +938,58 @@ void ClangPlugin::DiagnoseEd(cbEditor* ed, DiagnosticLevel diagLv)
         }
         if (dgItr->severity == sError)
             stc->SetIndicatorCurrent(errorIndicator);
-        else if (dgItr != diagnostics.begin() && dgItr->line == (dgItr - 1)->line && dgItr->range.first <= (dgItr - 1)->range.second)
+        else if (   dgItr != diagnostics.begin()
+                 && dgItr->line == (dgItr - 1)->line
+                 && dgItr->range.first <= (dgItr - 1)->range.second )
+        {
             continue; // do not overwrite the last indicator
+        }
         else
             stc->SetIndicatorCurrent(warningIndicator);
         stc->IndicatorFillRange(pos, range);
     }
     if (diagLv == dlFull)
         stc->AnnotationSetVisible(wxSCI_ANNOTATION_BOXED);
+}
+
+void ClangPlugin::HighlightOccurrences(cbEditor* ed)
+{
+    cbStyledTextCtrl* stc = ed->GetControl();
+    int pos = stc->GetCurrentPos();
+    const wxChar ch = stc->GetCharAt(pos);
+    if (   pos > 0
+        && (wxIsspace(ch) || (ch != wxT('_') && wxIspunct(ch)))
+        && !wxIsspace(stc->GetCharAt(pos - 1)) )
+    {
+        --pos;
+    }
+
+    // chosen a high value for indicator, hoping not to interfere with the indicators used by some lexers
+    // if they get updated from deprecated old style indicators someday.
+    const int theIndicator = 16;
+    stc->SetIndicatorCurrent(theIndicator);
+
+    // Set Styling:
+    // clear all style indications set in a previous run (is also done once after text gets unselected)
+    stc->IndicatorClearRange(0, stc->GetLength());
+
+    if (stc->GetTextRange(pos - 1, pos + 1).Strip().IsEmpty())
+        return;
+
+    // TODO: use independent key
+    wxColour highlightColour(Manager::Get()->GetColourManager()->GetColour(wxT("editor_highlight_occurrence")));
+
+    stc->IndicatorSetStyle(theIndicator, wxSCI_INDIC_HIGHLIGHT);
+    stc->IndicatorSetForeground(theIndicator, highlightColour);
+    stc->IndicatorSetUnder(theIndicator, true);
+
+    const int line = stc->LineFromPosition(pos);
+    const int column = pos - stc->PositionFromLine(line);
+    std::vector< std::pair<int, int> > occurrences;
+    m_Proxy.GetOccurrencesOf(ed->GetFilename(), line + 1, column + 1, m_TranslUnitId, occurrences);
+    for (std::vector< std::pair<int, int> >::const_iterator tkn = occurrences.begin();
+         tkn != occurrences.end(); ++tkn)
+    {
+        stc->IndicatorFillRange(tkn->first, tkn->second);
+    }
 }
